@@ -1,0 +1,264 @@
+package values
+
+const FeatureFlag = `
+# Default values for unleash.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+affinity: {}
+# podAntiAffinity:
+#   preferredDuringSchedulingIgnoredDuringExecution:
+#     - podAffinityTerm:
+#         labelSelector:
+#           matchExpressions:
+#             - key: app.kubernetes.io/instance
+#               operator: In
+#               values:
+#                 - unleash
+#         topologyKey: failure-domain.beta.kubernetes.io/zone
+#       weight: 100
+
+# HorizontalPodAutoscaler
+# https://kubernetes.io/de/docs/tasks/run-application/horizontal-pod-autoscale/
+
+# Unleash v4 comes with basic username/password and API tokens.
+#
+# To login the first time use the following:
+#    username: admin
+#    password: unleash4all
+#
+# You can also add your own custom auth:
+# https://github.com/Unleash/unleash-examples/tree/main/v4
+configMaps: {}
+#  index.js:
+#    mountPath: /unleash/index.js
+#    content: |-
+#      'use strict';
+#
+#      const passport = require('@passport-next/passport');
+#      const GoogleOAuth2Strategy = require('@passport-next/passport-google-oauth2').Strategy;
+#      const  { AuthenticationRequired } = require('unleash-server');
+#      const unleash = require('unleash-server');
+#
+#      function enableGoogleOauth(app, config, services) {
+#          const { baseUriPath } = config.server;
+#          const { userService } = services;
+#
+#          passport.use(
+#              new GoogleOAuth2Strategy(
+#                  {
+#                      clientID: process.env.GOOGLE_CLIENT_ID,
+#                      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+#                      callbackURL: process.env.GOOGLE_CALLBACK_URL,
+#                  },
+#
+#                  async (accessToken, refreshToken, profile, done) => {
+#                      const email  = profile.emails[0].value;
+#                      const user = await userService.loginUserWithoutPassword(email, true);
+#                      done(
+#                          null,
+#                          user
+#                      );
+#                  },
+#              ),
+#          );
+#
+#          app.use(passport.initialize());
+#          app.use(passport.session());
+#
+#          passport.serializeUser((user, done) => done(null, user));
+#          passport.deserializeUser((user, done) => done(null, user));
+#          app.get(
+#              '/api/admin/login',
+#              passport.authenticate('google', { scope: ['email'] }),
+#          );
+#
+#          app.get(
+#              '/api/auth/callback',
+#              passport.authenticate('google', {
+#                  failureRedirect: '/api/admin/error-login',
+#              }),
+#              (req, res) => {
+#                  res.redirect('/');
+#              },
+#          );
+#
+#          app.use('/api/admin/', (req, res, next) => {
+#              if (req.user) {
+#                  return next();
+#              }
+#
+#              return res
+#                  .status('401')
+#                  .json(
+#                      new AuthenticationRequired({
+#                          path: '/api/admin/login',
+#                          type: 'custom',
+#                          message: You have to identify yourself in order to use Unleash.
+#                              Click the button and follow the instructions.,
+#                      }),
+#                  )
+#                  .end();
+#          });
+#      }
+#
+#      unleash.start({
+#        authentication: {
+#          type: 'custom',
+#          customAuthHandler: enableGoogleOauth,
+#        },
+#      });
+
+containerPort: 4242
+
+dbConfig:
+  # if postgres dependency chart is used, this needs to be the same value as postgresql.auth.database
+  database: unleash
+  # Defaults to 'public'
+  schema: ""
+  host: postgres
+  # if postgres dependency chart is used, this needs to be the same value as postgresql.auth.password
+  # this should be change to something more secure or use an existing secret
+  pass: unleash
+  port: 5432
+  useExistingSecret:
+    name: ""
+    key: ""
+  # if postgres dependency chart is used, this needs to be the same value as postgresql.auth.username
+  user: unleash
+  ssl: false
+
+env: []
+#  - name: GOOGLE_CLIENT_ID
+#    value: 999999999999-999z99zz9zzzzzz99z9zz9z9zzzzzz9z.apps.googleusercontent.com
+#  - name: GOOGLE_CALLBACK_URL
+#    value: https://unleash.example.com/api/auth/callback
+
+# adds environmentvars for existing secrets to the container via tpl function
+existingSecrets:
+  ""
+  # - name: GOOGLE_CLIENT_SECRET
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: secretname
+#       key: secretkey
+
+fullnameOverride: ""
+
+image:
+  repository: unleashorg/unleash-server
+  tag:  # Obtained from .Chart.AppVersion, up to date tags available at https://hub.docker.com/r/unleashorg/unleash-server/tags
+  pullPolicy: Always
+
+imagePullSecrets: []
+
+ingress:
+  enabled: true
+  className: ""
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/issuer: letsencrypt-campus
+  # kubernetes.io/ingress.class: nginx
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: feature-flag.campus.clusterdiali.me
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls:
+    # Secrets must be manually created in the namespace.
+    - secretName: feature-flag-clusterdiali-me-tls
+      hosts:
+        - feature-flag.campus.clusterdiali.me
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+initContainers: []
+
+livenessProbe:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 30
+  timeoutSeconds: 10
+
+nameOverride: ""
+
+nodeSelector: {}
+
+podAnnotations: {}
+
+readinessProbe:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 30
+  timeoutSeconds: 10
+  periodSeconds: 10
+  successThreshold: 5
+
+replicaCount: 1
+
+resources:
+  {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+#   memory: 128Mi
+
+# The key value pairs under secrets will be included in a Kubernetes Secret,
+# and they will generate environment variables that use valueFrom to refer to
+# the secrets in the Kubernetes Secret.
+secrets: {}
+#  SHARED_SECRET: 999z9z9z99https://meet.google.com/rtk-rbjr-tkv99zzz9
+#  GOOGLE_CLIENT_SECRET: zzzZZz9ZZzZzZzz9Z9zZZZZZ
+
+service:
+  # Supported types: ClusterIP, NodePort, LoadBalancer
+  type: ClusterIP
+  port: 4242
+  # nodePort is optional and only used when service.type is NodePort or LoadBalancer
+  nodePort: ""
+  annotations: {}
+  ## Load Balancer sources
+  ## ref: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
+  ## Example:
+  ## loadBalancerSourceRanges:
+  ## - 10.10.10.0/24
+  ## loadBalancerIP: ""
+  loadBalancerSourceRanges: []
+  loadBalancerIP: ""
+
+tolerations: []
+
+# VerticalPodAutoscaler
+vpa:
+  enabled: false
+
+# postgresql dependency chart config
+# https://github.com/bitnami/charts/blob/master/bitnami/postgresql/values.yaml
+postgresql:
+  enabled: true
+  fullnameOverride: "unleash-postgresql"
+  auth:
+    username: unleash
+    # this should be change to something more secure or use an existing secret
+    password: unleash
+    database: unleash
+
+securityContext: {}
+# Autoscaling
+# https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+# Allows Unleash to setup HPA
+autoscaling:
+  enabled: false
+  minReplicas: 0
+  maxReplicas: 0
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 70`
